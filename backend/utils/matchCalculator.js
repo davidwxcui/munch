@@ -4,51 +4,39 @@ import Swipe from '../models/Swipe.js';
  * Calculate matches between two users in a room
  * Returns restaurants that both users swiped right on
  */
-export async function calculateMatches(roomId, socketIds) {
-  if (!socketIds || socketIds.length !== 2) {
-    throw new Error('Exactly 2 participants required for matching');
-  }
-
-  const [user1Id, user2Id] = socketIds;
-
-  // Get all right swipes for user 1
-  const user1Swipes = await Swipe.find({
+export async function calculateMatches(roomId) {
+  // Find all right swipes for this room
+  const swipes = await Swipe.find({
     roomId,
-    socketId: user1Id,
     direction: 'right'
   }).lean();
 
-  // Get all right swipes for user 2
-  const user2Swipes = await Swipe.find({
-    roomId,
-    socketId: user2Id,
-    direction: 'right'
-  }).lean();
+  // Group by restaurantId
+  const swipesByRestaurant = {};
+  
+  swipes.forEach(swipe => {
+    if (!swipesByRestaurant[swipe.restaurantId]) {
+      swipesByRestaurant[swipe.restaurantId] = {
+        restaurantData: swipe.restaurantData,
+        socketIds: new Set()
+      };
+    }
+    swipesByRestaurant[swipe.restaurantId].socketIds.add(swipe.socketId);
+  });
 
-  // Find common restaurant IDs
-  const user1RestaurantIds = new Set(
-    user1Swipes.map(swipe => swipe.restaurantId)
-  );
-
-  const matches = user2Swipes.filter(swipe =>
-    user1RestaurantIds.has(swipe.restaurantId)
-  );
-
-  // Return unique matches with full restaurant data
-  const uniqueMatches = [];
-  const seenIds = new Set();
-
-  for (const match of matches) {
-    if (!seenIds.has(match.restaurantId)) {
-      seenIds.add(match.restaurantId);
-      uniqueMatches.push({
-        restaurantId: match.restaurantId,
-        ...match.restaurantData
+  // Filter for restaurants with at least 2 distinct users (socketIds)
+  const matches = [];
+  
+  Object.values(swipesByRestaurant).forEach(item => {
+    if (item.socketIds.size >= 2) {
+      matches.push({
+        restaurantId: item.restaurantData.restaurantId || item.restaurantData.id, // Handle potential data inconsistencies
+        ...item.restaurantData
       });
     }
-  }
+  });
 
-  return uniqueMatches;
+  return matches;
 }
 
 /**

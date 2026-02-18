@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Box, Typography, TextField, Button, Alert, CircularProgress } from '@mui/material';
 import Layout from '../components/Layout';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
+import { api } from '../services/api';
 
 const JoinRoomPage = () => {
   const navigate = useNavigate();
@@ -19,21 +20,8 @@ const JoinRoomPage = () => {
 
     try {
       // Validate room exists by attempting to fetch it (or join via socket later)
-      // For now, we'll try to get room info
-      const response = await fetch('http://localhost:5000/api/rooms/join', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ roomKey: roomKey.toUpperCase() }),
-      });
+      const data = await api.joinRoom(roomKey.toUpperCase());
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Room not found');
-      }
-
-      const data = await response.json();
       navigate(`/swipe/${data.roomId}`, { 
         state: { roomKey: data.roomKey } 
       });

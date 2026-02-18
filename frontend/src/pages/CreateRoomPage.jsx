@@ -7,6 +7,7 @@ import {
 } from '@mui/material';
 import Layout from '../components/Layout';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import { api } from '../services/api';
 
 const CreateRoomPage = () => {
   const navigate = useNavigate();
@@ -46,24 +47,9 @@ const CreateRoomPage = () => {
             lng: position.coords.longitude
           };
 
-          const response = await fetch('http://localhost:5000/api/rooms', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              ...filters, // Spread filters to root level
-              location    // Add location
-            }),
-          });
+          const data = await api.createRoom(filters, location);
           
-          if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.error || 'Failed to create room');
-          }
-          
-          const data = await response.json();
-          navigate(`/swipe/${data.roomId}`, { // Note: backend returns roomId, not room._id
+          navigate(`/swipe/${data.roomId}`, { 
             state: { roomKey: data.roomKey } 
           });
         } catch (err) {
@@ -105,18 +91,8 @@ const CreateRoomPage = () => {
       // Richmond, BC coordinates
       const location = { lat: 49.1666, lng: -123.1336 };
       
-      const response = await fetch('http://localhost:5000/api/rooms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...filters, location }),
-      });
+      const data = await api.createRoom(filters, location);
       
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || 'Failed to create room');
-      }
-      
-      const data = await response.json();
       navigate(`/swipe/${data.roomId}`, { state: { roomKey: data.roomKey } });
     } catch (err) {
       setError(err.message || 'Failed to create room');

@@ -13,6 +13,7 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PhoneIcon from '@mui/icons-material/Phone';
 import StarIcon from '@mui/icons-material/Star';
+import { api } from '../services/api';
 
 // Simple hook if react-use isn't installed
 const useSimpleWindowSize = () => {
@@ -45,9 +46,7 @@ const MatchesPage = () => {
 
   const fetchMatches = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/swipes/${roomId}`);
-      if (!response.ok) throw new Error('Failed to load matches');
-      const data = await response.json();
+      const data = await api.getMatches(roomId);
       setMatches(data.matches || []);
     } catch (err) {
       console.error(err);

@@ -1,0 +1,33 @@
+services:
+  # BACKEND SERVICE
+  - type: web
+    name: munch-backend
+    env: node
+    root: backend
+    buildCommand: npm install
+    startCommand: node server.js
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: GOOGLE_PLACES_API_KEY
+        sync: false # User must enter this in dashboard
+
+  # FRONTEND SERVICE
+  - type: web
+    name: munch-frontend
+    env: static
+    root: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    plan: free
+    routes:
+      - type: rewrite
+        source: /**
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: munch-backend
+          property: url

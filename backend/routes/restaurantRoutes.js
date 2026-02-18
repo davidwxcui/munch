@@ -1,4 +1,5 @@
 import express from 'express';
+import axios from 'axios';
 import { searchRestaurants, getRestaurantDetails, getPhotoUrl } from '../services/googlePlacesService.js';
 import Room from '../models/Room.js';
 import { googlePlacesRateLimiter, globalApiRateLimiter } from '../middleware/rateLimiter.js';
@@ -38,9 +39,10 @@ router.get('/', googlePlacesRateLimiter, globalApiRateLimiter, async (req, res) 
     const restaurantsWithPhotos = restaurants.map(restaurant => ({
       ...restaurant,
       photos: restaurant.photos.map(photo => ({
-        url: getPhotoUrl(photo.reference, 400),
-        width: photo.width,
-        height: photo.height
+        ...photo,
+        // The service now returns relative URLs or full URLs, but we want to ensure
+        // they are accessible. If they are relative, the frontend proxy handles it.
+        url: photo.url 
       }))
     }));
 
@@ -52,6 +54,41 @@ router.get('/', googlePlacesRateLimiter, globalApiRateLimiter, async (req, res) 
   } catch (error) {
     console.error('Error fetching restaurants:', error);
     res.status(500).json({ error: 'Failed to fetch restaurants' });
+  }
+});
+
+/**
+ * GET /api/restaurants/photo
+ * Proxy Google Places Photo to avoid CORS/Auth issues on frontend
+ */
+router.get('/photo', async (req, res) => {
+  try {
+    const { name, maxwidth } = req.query; // 'name' is the resource name from New API
+    
+    if (!name) {
+      return res.status(400).send('Missing photo reference (name)');
+    }
+
+    const API_KEY = process.env.GOOGLE_PLACES_API_KEY;
+    // Construct the Google URL
+    // New API format: https://places.googleapis.com/v1/{name}/media?key={KEY}&maxWidthPx={width}
+    const googlePhotoUrl = `https://places.googleapis.com/v1/${name}/media?key=${API_KEY}&maxWidthPx=${maxwidth || 400}`;
+
+    const response = await axios({
+      method: 'get',
+      url: googlePhotoUrl,
+      responseType: 'stream'
+    });
+
+    // Forward the headers (content-type, etc.)
+    res.setHeader('Content-Type', response.headers['content-type']);
+    res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
+
+    response.data.pipe(res);
+
+  } catch (error) {
+    // console.error('Error proxing photo:', error.message);
+    res.status(404).send('Photo not found');
   }
 });
 
@@ -75,7 +112,7 @@ router.get('/:id', googlePlacesRateLimiter, globalApiRateLimiter, async (req, re
     const detailsWithPhotos = {
       ...details,
       photos: details.photos.map(photo => ({
-        url: getPhotoUrl(photo.reference, 800),
+        url: photo.url, // Service already returns proxy URL
         width: photo.width,
         height: photo.height
       }))
