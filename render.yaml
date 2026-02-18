@@ -3,7 +3,7 @@ services:
   - type: web
     name: munch-backend
     env: node
-    root: backend
+    rootDir: backend
     buildCommand: npm install
     startCommand: node server.js
     envVars:
@@ -16,7 +16,7 @@ services:
   - type: web
     name: munch-frontend
     env: static
-    root: frontend
+    rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
     routes:
