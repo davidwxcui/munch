@@ -1,0 +1,46 @@
+.join-room-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.join-room-container {
+  background: white;
+  border-radius: 20px;
+  padding: 40px;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.room-key-input {
+  width: 100%;
+  font-size: 18px;
+  text-align: center;
+  letter-spacing: 1px;
+}
+
+.hint {
+  color: #a0aec0;
+  font-size: 14px;
+  margin-top: 8px;
+  text-align: center;
+}
+
+.join-button {
+  width: 100%;
+  padding: 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-size: 18px;
+  font-weight: 600;
+  border-radius: 12px;
+  margin-top: 32px;
+}
+
+.join-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(102, 126, 234, 0.4);
+}
