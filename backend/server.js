@@ -9,6 +9,7 @@ import roomRoutes from './routes/roomRoutes.js';
 import restaurantRoutes from './routes/restaurantRoutes.js';
 import swipeRoutes from './routes/swipeRoutes.js';
 import Room from './models/Room.js';
+import Swipe from './models/Swipe.js';
 
 dotenv.config();
 
@@ -90,6 +91,36 @@ io.on('connection', (socket) => {
   // Handle swipe
   socket.on('swipe', async ({ roomId, restaurantId, direction, restaurantData }) => {
     try {
+      // Save swipe to database
+      const swipe = new Swipe({
+        roomId,
+        socketId: socket.id,
+        restaurantId,
+        direction,
+        restaurantData
+      });
+      await swipe.save();
+
+      // Check for match if swiped right
+      if (direction === 'right') {
+        const match = await Swipe.findOne({
+          roomId,
+          restaurantId,
+          direction: 'right',
+          socketId: { $ne: socket.id }
+        });
+
+        if (match) {
+          console.log(`Match found in room ${roomId} for restaurant ${restaurantId}`);
+          
+          // Emit match found event to all participants
+          io.to(roomId).emit('match-found', restaurantData);
+          
+          // Optional: Update room status to completed?
+          // await Room.findByIdAndUpdate(roomId, { status: 'completed' });
+        }
+      }
+
       // Broadcast swipe to other participants in the room
       socket.to(roomId).emit('partner-swiped', {
         restaurantId,
