@@ -1,16 +1,18 @@
-import { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { 
+  Box, Typography, Button, Slider, FormControl, 
+  InputLabel, Select, MenuItem, ToggleButton, 
+  ToggleButtonGroup, Stack, Paper, Alert, CircularProgress 
+} from '@mui/material';
+import Layout from '../components/Layout';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import { api } from '../services/api';
-import socketService from '../services/socketService';
-import './CreateRoomPage.css';
 
-function CreateRoomPage() {
+const CreateRoomPage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [roomKey, setRoomKey] = useState('');
-  const [roomId, setRoomId] = useState('');
-  const [waitingForPartner, setWaitingForPartner] = useState(false);
   
   const [filters, setFilters] = useState({
     maxDistance: 5000,
@@ -18,176 +20,192 @@ function CreateRoomPage() {
     priceLevel: [1, 2, 3, 4]
   });
 
-  const [location, setLocation] = useState(null);
-
-  useEffect(() => {
-    // Get user's location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-        },
-        (error) => {
-          console.error('Error getting location:', error);
-          // Default to San Francisco
-          setLocation({ lat: 37.7749, lng: -122.4194 });
-        }
-      );
-    } else {
-      // Default location
-      setLocation({ lat: 37.7749, lng: -122.4194 });
+  const handlePriceChange = (event, newPriceLevel) => {
+    if (newPriceLevel.length) {
+      setFilters({ ...filters, priceLevel: newPriceLevel });
     }
-  }, []);
+  };
 
-  useEffect(() => {
-    if (roomId && roomKey) {
-      // Connect to socket and join room
-      socketService.connect();
-      socketService.joinRoom(roomId, roomKey);
-
-      // Listen for room updates
-      socketService.onRoomUpdated((data) => {
-        if (data.participantCount === 2 && data.status === 'active') {
-          // Both users joined, navigate to swipe page
-          navigate(`/swipe/${roomId}`);
-        }
-      });
-
-      return () => {
-        socketService.removeAllListeners();
-      };
-    }
-  }, [roomId, roomKey, navigate]);
-
-  const handleCreateRoom = async () => {
-    if (!location) {
-      setError('Waiting for location...');
+  const createRoom = async () => {
+    setLoading(true);
+    setError('');
+    
+    // Get user location first
+    if (!navigator.geolocation) {
+      setError('Geolocation is not supported by your browser');
+      setLoading(false);
       return;
     }
 
+    console.log('Requesting location...');
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        console.log('Location received:', position.coords);
+        try {
+          const location = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+
+          const data = await api.createRoom(filters, location);
+          
+          navigate(`/swipe/${data.roomId}`, { 
+            state: { roomKey: data.roomKey } 
+          });
+        } catch (err) {
+          setError(err.message || 'Failed to create room. Please try again.');
+          console.error(err);
+        } finally {
+          setLoading(false);
+        }
+      },
+      (err) => {
+        console.error('Geolocation error:', err);
+        let errorMessage = 'Unable to retrieve your location.';
+        if (err.code === 1) errorMessage = 'Location permission denied. Please allow access in browser settings.';
+        if (err.code === 2) errorMessage = 'Location unavailable.';
+        if (err.code === 3) errorMessage = 'Location request timed out.';
+        
+        setError(errorMessage + ' Please try again.');
+        setLoading(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+  };
+
+  const distanceMarks = [
+    { value: 1000, label: '1km' },
+    { value: 5000, label: '5km' },
+    { value: 10000, label: '10km' },
+    { value: 20000, label: '20km' },
+  ];
+
+  const useRichmondLocation = async () => {
     setLoading(true);
     setError('');
-
     try {
-      const response = await api.createRoom(filters, location);
-      setRoomKey(response.roomKey);
-      setRoomId(response.roomId);
-      setWaitingForPartner(true);
+      // Richmond, BC coordinates
+      const location = { lat: 49.1666, lng: -123.1336 };
+      
+      const data = await api.createRoom(filters, location);
+      
+      navigate(`/swipe/${data.roomId}`, { state: { roomKey: data.roomKey } });
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Failed to create room');
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePriceLevelToggle = (level) => {
-    setFilters(prev => ({
-      ...prev,
-      priceLevel: prev.priceLevel.includes(level)
-        ? prev.priceLevel.filter(l => l !== level)
-        : [...prev.priceLevel, level].sort()
-    }));
-  };
-
-  const copyRoomKey = () => {
-    navigator.clipboard.writeText(roomKey);
-    alert('Room key copied to clipboard!');
-  };
-
-  if (waitingForPartner) {
-    return (
-      <div className="create-room-page">
-        <div className="waiting-container fade-in">
-          <h2>Room Created! 🎉</h2>
-          <div className="room-key-display">
-            <p className="label">Share this code with your friend:</p>
-            <div className="room-key">
-              {roomKey}
-            </div>
-            <button className="copy-button" onClick={copyRoomKey}>
-              📋 Copy Code
-            </button>
-          </div>
-          <div className="waiting-indicator">
-            <div className="spinner"></div>
-            <p>Waiting for your friend to join...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="create-room-page">
-      <div className="create-room-container fade-in">
-        <button className="back-button" onClick={() => navigate('/')}>
-          ← Back
-        </button>
-        
-        <h2>Create Room</h2>
-        <p className="subtitle">Set your preferences for restaurant search</p>
+    <Layout title="Create Room" showBack>
+      <Paper elevation={0} sx={{ p: 0, bgcolor: 'transparent' }}>
+        <Typography variant="h5" gutterBottom fontWeight="bold" sx={{ mb: 3 }}>
+          Room Settings
+        </Typography>
 
-        <div className="form-group">
-          <label>Max Distance: {(filters.maxDistance / 1000).toFixed(1)} km</label>
-          <input
-            type="range"
-            min="1000"
-            max="25000"
-            step="1000"
-            value={filters.maxDistance}
-            onChange={(e) => setFilters({ ...filters, maxDistance: parseInt(e.target.value) })}
-            className="slider"
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Cuisine Type</label>
-          <select
-            value={filters.cuisine}
-            onChange={(e) => setFilters({ ...filters, cuisine: e.target.value })}
+        {error && (
+          <Alert 
+            severity="error" 
+            sx={{ mb: 3 }}
+            action={
+              <Button color="inherit" size="small" onClick={useRichmondLocation}>
+                Use Richmond, BC
+              </Button>
+            }
           >
-            <option value="restaurant">All Restaurants</option>
-            <option value="italian">Italian</option>
-            <option value="japanese">Japanese</option>
-            <option value="chinese">Chinese</option>
-            <option value="mexican">Mexican</option>
-            <option value="thai">Thai</option>
-            <option value="indian">Indian</option>
-            <option value="french">French</option>
-            <option value="american">American</option>
-          </select>
-        </div>
+            {error}
+          </Alert>
+        )}
 
-        <div className="form-group">
-          <label>Price Range</label>
-          <div className="price-buttons">
-            {[1, 2, 3, 4].map(level => (
-              <button
-                key={level}
-                className={`price-button ${filters.priceLevel.includes(level) ? 'active' : ''}`}
-                onClick={() => handlePriceLevelToggle(level)}
+        <Stack spacing={4}>
+          {/* Cuisine Selection */}
+          <Box>
+            <Typography gutterBottom fontWeight="medium">Cuisine</Typography>
+            <FormControl fullWidth>
+              <Select
+                value={filters.cuisine}
+                onChange={(e) => setFilters({ ...filters, cuisine: e.target.value })}
+                displayEmpty
+                sx={{ borderRadius: 3, bgcolor: 'white' }}
               >
-                {'$'.repeat(level)}
-              </button>
-            ))}
-          </div>
-        </div>
+                <MenuItem value="restaurant">Any</MenuItem>
+                <MenuItem value="italian_restaurant">Italian</MenuItem>
+                <MenuItem value="chinese_restaurant">Chinese</MenuItem>
+                <MenuItem value="mexican_restaurant">Mexican</MenuItem>
+                <MenuItem value="japanese_restaurant">Japanese</MenuItem>
+                <MenuItem value="american_restaurant">American</MenuItem>
+                <MenuItem value="thai_restaurant">Thai</MenuItem>
+                <MenuItem value="indian_restaurant">Indian</MenuItem>
+                <MenuItem value="french_restaurant">French</MenuItem>
+                <MenuItem value="cafe">Cafe</MenuItem>
+                <MenuItem value="bar">Bar</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
 
-        {error && <div className="error-message">{error}</div>}
+          {/* Distance Slider */}
+          <Box>
+            <Typography gutterBottom fontWeight="medium">
+              Max Distance: {filters.maxDistance / 1000} km
+            </Typography>
+            <Box sx={{ px: 2 }}>
+              <Slider
+                value={filters.maxDistance}
+                onChange={(e, val) => setFilters({ ...filters, maxDistance: val })}
+                step={1000}
+                min={1000}
+                max={20000}
+                marks={distanceMarks}
+                valueLabelDisplay="auto"
+                valueLabelFormat={(value) => `${value / 1000}km`}
+              />
+            </Box>
+          </Box>
 
-        <button
-          className="create-button"
-          onClick={handleCreateRoom}
-          disabled={loading || !location}
-        >
-          {loading ? 'Creating...' : 'Create Room'}
-        </button>
-      </div>
-    </div>
+          {/* Price Level */}
+          <Box>
+            <Typography gutterBottom fontWeight="medium">Price Range</Typography>
+            <ToggleButtonGroup
+              value={filters.priceLevel}
+              onChange={handlePriceChange}
+              aria-label="price level"
+              fullWidth
+              sx={{ 
+                bgcolor: 'white', 
+                borderRadius: 3,
+                '& .MuiToggleButton-root': { py: 1.5 }
+              }}
+            >
+              {[1, 2, 3, 4].map((price) => (
+                <ToggleButton key={price} value={price} aria-label={`price level ${price}`}>
+                  <Stack direction="row" spacing={0.5}>
+                    {Array(price).fill(0).map((_, i) => (
+                      <AttachMoneyIcon key={i} fontSize="small" />
+                    ))}
+                  </Stack>
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+          </Box>
+
+          <Button 
+            variant="contained" 
+            size="large" 
+            onClick={createRoom}
+            disabled={loading}
+            sx={{ mt: 4, py: 1.5 }}
+          >
+            {loading ? <CircularProgress size={24} color="inherit" /> : 'Start Swiping'}
+          </Button>
+        </Stack>
+      </Paper>
+    </Layout>
   );
-}
+};
 
 export default CreateRoomPage;

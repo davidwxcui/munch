@@ -79,15 +79,11 @@ router.get('/:roomId', async (req, res) => {
       return res.status(404).json({ error: 'Room not found' });
     }
 
-    if (room.participants.length !== 2) {
-      return res.status(400).json({ 
-        error: 'Room must have exactly 2 participants to calculate matches' 
-      });
-    }
+    // (Removed strict participant count check to allow viewing matches even if one person disconnects)
 
     // Calculate matches
-    const socketIds = room.participants.map(p => p.socketId);
-    const matches = await calculateMatches(roomId, socketIds);
+    // const socketIds = room.participants.map(p => p.socketId);
+    const matches = await calculateMatches(roomId);
 
     // Sort by rating (descending)
     matches.sort((a, b) => (b.rating || 0) - (a.rating || 0));

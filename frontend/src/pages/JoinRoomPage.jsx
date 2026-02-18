@@ -1,82 +1,102 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Box, Typography, TextField, Button, Alert, CircularProgress } from '@mui/material';
+import Layout from '../components/Layout';
+import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
 import { api } from '../services/api';
-import socketService from '../services/socketService';
-import './JoinRoomPage.css';
 
-function JoinRoomPage() {
+const JoinRoomPage = () => {
   const navigate = useNavigate();
   const [roomKey, setRoomKey] = useState('');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleJoinRoom = async (e) => {
+  const handleJoin = async (e) => {
     e.preventDefault();
-    
-    const trimmedKey = roomKey.trim().toUpperCase();
-    if (trimmedKey.length !== 4) {
-      setError('Please enter a 4-letter room key');
-      return;
-    }
+    if (!roomKey.trim()) return;
 
     setLoading(true);
     setError('');
 
     try {
-      const response = await api.joinRoom(trimmedKey);
+      // Validate room exists by attempting to fetch it (or join via socket later)
+      const data = await api.joinRoom(roomKey.toUpperCase());
       
-      // Connect to socket and join room
-      socketService.connect();
-      socketService.joinRoom(response.roomId, trimmedKey);
-
-      // Navigate to swipe page
-      navigate(`/swipe/${response.roomId}`);
-      
+      navigate(`/swipe/${data.roomId}`, { 
+        state: { roomKey: data.roomKey } 
+      });
     } catch (err) {
-      setError(err.message);
+      setError('Room not found. Please check the code and try again.');
+      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="join-room-page">
-      <div className="join-room-container fade-in">
-        <button className="back-button" onClick={() => navigate('/')}>
-          ← Back
-        </button>
-        
-        <h2>Join Room</h2>
-        <p className="subtitle">Enter the 4-letter code shared by your friend</p>
+    <Layout title="Join Room" showBack>
+      <Box 
+        component="form" 
+        onSubmit={handleJoin}
+        sx={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          justifyContent: 'center', 
+          flexGrow: 1, 
+          gap: 3 
+        }}
+      >
+        <Box sx={{ textAlign: 'center', mb: 2 }}>
+          <MeetingRoomIcon color="primary" sx={{ fontSize: 60, mb: 2 }} />
+          <Typography variant="h5" fontWeight="bold">
+            Enter Room Code
+          </Typography>
+          <Typography color="text.secondary">
+            Ask your friend for the 4-character code
+          </Typography>
+        </Box>
 
-        <form onSubmit={handleJoinRoom}>
-          <div className="form-group">
-            <label>Room Key</label>
-            <input
-              type="text"
-              placeholder="ABCD"
-              value={roomKey}
-              onChange={(e) => setRoomKey(e.target.value.toUpperCase())}
-              className="room-key-input"
-              maxLength={4}
-              autoFocus
-            />
-            <p className="hint">Format: 4 letters</p>
-          </div>
+        {error && <Alert severity="error">{error}</Alert>}
 
-          {error && <div className="error-message">{error}</div>}
+        <TextField
+          autoFocus
+          fullWidth
+          label="Room Code"
+          value={roomKey}
+          onChange={(e) => setRoomKey(e.target.value.toUpperCase())}
+          inputProps={{ 
+            maxLength: 4,
+            style: { 
+              textTransform: 'uppercase', 
+              textAlign: 'center', 
+              fontSize: '2rem', 
+              letterSpacing: '0.5rem',
+              fontWeight: 'bold'
+            } 
+          }}
+          placeholder="ABCD"
+          variant="outlined"
+          sx={{ 
+            '& .MuiOutlinedInput-root': { 
+              borderRadius: 3,
+              bgcolor: 'white'
+            } 
+          }}
+        />
 
-          <button
-            type="submit"
-            className="join-button"
-            disabled={loading}
-          >
-            {loading ? 'Joining...' : 'Join Room'}
-          </button>
-        </form>
-      </div>
-    </div>
+        <Button 
+          type="submit" 
+          variant="contained" 
+          size="large" 
+          fullWidth
+          disabled={!roomKey.trim() || loading}
+          sx={{ py: 1.5 }}
+        >
+          {loading ? <CircularProgress size={24} color="inherit" /> : 'Join Room'}
+        </Button>
+      </Box>
+    </Layout>
   );
-}
+};
 
 export default JoinRoomPage;
